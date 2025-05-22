@@ -1,0 +1,6 @@
+@CheckoutSession.web_HostAddress = http://localhost:4242
+
+GET {{CheckoutSession.web_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
