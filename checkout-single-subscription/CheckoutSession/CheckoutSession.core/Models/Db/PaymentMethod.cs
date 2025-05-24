@@ -1,6 +1,6 @@
-namespace CheckoutSession.core.Models.dbOp
+namespace CheckoutSession.core.Models.Db
 {
-    public class PaymentMethodDb
+    public class PaymentMethod
     {
         public int Id { get; set; }
         public string StripePaymentMethodId { get; set; }

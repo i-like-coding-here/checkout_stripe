@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace CheckoutSession.core.Models.billing
+namespace CheckoutSession.core.Models.Dtos.Requests
 {
     public class UpdateSubscriptionRequest
     {

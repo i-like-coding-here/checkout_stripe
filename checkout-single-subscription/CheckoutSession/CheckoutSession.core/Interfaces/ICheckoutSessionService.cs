@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using CheckoutSession.core.Models.billing;
+using CheckoutSession.core.Models.Dtos.Requests;
+using CheckoutSession.core.Models.Dtos.Responses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CheckoutSession.core.Interfaces
@@ -17,7 +18,7 @@ namespace CheckoutSession.core.Interfaces
         //Task EnforceEnterprisePlanRulesAsync(string customerId);
         Task<bool> CanSubscribeToPlan(string customerId, string requestedPriceId);
 
-        Task<CheckoutSessionDto> CheckoutSession(string sessionId);
+        Task<CheckoutSessionResponse> CheckoutSession(string sessionId);
         Task SyncPlansToStripe();
         Task<Guid> GetTenantIdByStripeCustomerId(string stripeCustomerId);
         //SubscriptionResponse UpdateSubscription(string subscriptionId, string newPriceKey);

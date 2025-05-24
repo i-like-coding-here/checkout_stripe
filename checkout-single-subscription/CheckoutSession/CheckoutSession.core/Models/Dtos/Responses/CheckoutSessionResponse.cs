@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CheckoutSession.core.Models.billing
+namespace CheckoutSession.core.Models.Dtos.Responses
 {
-    public class CheckoutSessionDto
+    public class CheckoutSessionResponse
     {
         public string Id { get; set; }
         public string CustomerId { get; set; }

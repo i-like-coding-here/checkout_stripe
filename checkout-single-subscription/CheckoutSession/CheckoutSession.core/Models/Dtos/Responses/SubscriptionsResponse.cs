@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Stripe;
 
-namespace CheckoutSession.core.Models.billing
+namespace CheckoutSession.core.Models.Dtos.Responses
 {
     public class SubscriptionsResponse
     {

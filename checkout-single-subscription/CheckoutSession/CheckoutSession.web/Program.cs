@@ -1,12 +1,11 @@
 using CheckoutSession.core.Configuration;
+using CheckoutSession.core.Data;
 using CheckoutSession.core.Interfaces;
 using CheckoutSession.core.Services;
-using CheckoutSession.core.Data;
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Stripe;
-using DotNetEnv;
-//using Stripe.V2;
 
 Env.Load();
 
@@ -73,7 +72,6 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-// Static file handling
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(staticDirFullPath),

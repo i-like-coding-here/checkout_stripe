@@ -2,7 +2,7 @@ using Stripe;
 using Newtonsoft.Json;
 
 
-namespace CheckoutSession.core.Models.billing
+namespace CheckoutSession.core.Models.Dtos.Responses
 {
     public class SubscriptionCreateResponse
     {
@@ -11,9 +11,5 @@ namespace CheckoutSession.core.Models.billing
 
         [JsonProperty("clientSecret")]
         public string ClientSecret { get; set; }
-
-        // [JsonProperty("checkoutSession")]
-        // public string CheckoutSessionId { get; set; }
-
     }
 }

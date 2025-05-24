@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-namespace CheckoutSession.core.Models.billing
+namespace CheckoutSession.core.Models.Dtos.Responses
 {
     public class NewConfigResponse
     {

@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CheckoutSession.core.Models.dbOp
+namespace CheckoutSession.core.Models.Db
 {
     public class SubscriptionPlan
     {

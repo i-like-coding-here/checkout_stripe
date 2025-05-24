@@ -1,11 +1,12 @@
-﻿using Microsoft.Extensions.Options;
-using CheckoutSession.core.Interfaces;
-using CheckoutSession.core.Models.billing;
-using CheckoutSession.core.Configuration;
-using Stripe;
-using CheckoutSession.core.Models.dbOp;
+﻿using CheckoutSession.core.Configuration;
 using CheckoutSession.core.Data;
+using CheckoutSession.core.Interfaces;
+using CheckoutSession.core.Models.Db;
+using CheckoutSession.core.Models.Dtos.Requests;
+using CheckoutSession.core.Models.Dtos.Responses;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Stripe;
 using Stripe.Checkout;
 
 namespace CheckoutSession.core.Services
@@ -149,12 +150,12 @@ namespace CheckoutSession.core.Services
         }
 
 
-        public async Task<CheckoutSessionDto> CheckoutSession(string sessionId)
+        public async Task<CheckoutSessionResponse> CheckoutSession(string sessionId)
         {
             var service = new SessionService(_client);
             var session = await service.GetAsync(sessionId);
 
-            return new CheckoutSessionDto
+            return new CheckoutSessionResponse
             {
                 Id = session.Id,
                 CustomerId = session.CustomerId,
@@ -208,7 +209,7 @@ namespace CheckoutSession.core.Services
 
         public async Task<SubscriptionResponse> UpdateSubscription(UpdateSubscriptionRequest req)
         {
-            var subscription = new SubscriptionService().Get( req.Subscription);
+            var subscription = await new SubscriptionService().GetAsync( req.Subscription);
 
             var stripeSubscriptionId = req.Subscription;
 
@@ -401,7 +402,7 @@ namespace CheckoutSession.core.Services
                 case "customer.subscription.updated":
                 case "customer.subscription.deleted":
 
-                    var subscription = stripeEvent.Data.Object as Subscription;
+                    var subscription = stripeEvent.Data.Object as Stripe.Subscription;
                     if (subscription == null) break;
 
                     var existingTenant = await _dbContext.Tenants
@@ -441,7 +442,7 @@ namespace CheckoutSession.core.Services
 
                     if (existingSubscription == null)
                     {
-                        var newSubscription = new SubscriptionDb
+                        var newSubscription = new Models.Db.Subscription
                         {
                             StripeSubscriptionId = subscription.Id,
                             PlanId = priceId,

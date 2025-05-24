@@ -1,8 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Stripe;
-using System.Collections.Generic;
 
-namespace CheckoutSession.core.Models.billing
+namespace CheckoutSession.core.Models.Dtos.Responses
 {
     public class ConfigResponse
     {

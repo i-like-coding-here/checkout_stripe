@@ -1,11 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using CheckoutSession.core.Interfaces;
-using System.Threading.Tasks;
-using System.IO;
-using CheckoutSession.core.Models.billing;
-using Microsoft.AspNetCore.Http.HttpResults;
+﻿using CheckoutSession.core.Interfaces;
+using CheckoutSession.core.Models.Dtos.Requests;
+using CheckoutSession.core.Models.Dtos.Responses;
+using Microsoft.AspNetCore.Mvc;
 using Stripe;
-using Stripe.V2;
 
 namespace CheckoutSession.api.Controllers
 {

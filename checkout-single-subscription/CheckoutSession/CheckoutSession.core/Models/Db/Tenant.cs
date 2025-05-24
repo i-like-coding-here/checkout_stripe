@@ -2,7 +2,7 @@ using Stripe;
 using Newtonsoft;
 using Newtonsoft.Json;
 
-namespace CheckoutSession.core.Models.dbOp
+namespace CheckoutSession.core.Models.Db
 {
     public class Tenant
     {
@@ -11,16 +11,13 @@ namespace CheckoutSession.core.Models.dbOp
 
         public string Email { get; set; }
         public string Name { get; set; }
-        //public string Phone { get; set; }
-
         public string AddressLine1 { get; set; }
         public string City { get; set; }
         public string State { get; set; }
         public string PostalCode { get; set; }
         public string Country { get; set; }
-
-        public ICollection<SubscriptionDb> Subscriptions { get; set; }
-        public ICollection<PaymentMethodDb> PaymentMethodDb { get; set; }
+        public ICollection<Subscription> Subscription { get; set; }
+        public ICollection<PaymentMethod> PaymentMethod { get; set; }
     }
 
 
