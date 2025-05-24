@@ -38,104 +38,116 @@ namespace CheckoutSession.core.Services
             };
         }
 
-        public async Task EnforceEnterprisePlanRulesAsync(string customerId)
+        public async Task<bool> CanSubscribeToPlan(string customerId, string requestedPriceId)
         {
-            var subscriptionService = new SubscriptionService(_client);
+            var priceService = new PriceService();
+            var requestedPrice = await priceService.GetAsync(requestedPriceId);
+            var requestedLookupKey = requestedPrice.LookupKey;
 
-            // List all active subscriptions for this customer
-            var allSubs = subscriptionService.List(new SubscriptionListOptions
+            var subscriptionService = new SubscriptionService(_client);
+            var activeSubs = await subscriptionService.ListAsync(new SubscriptionListOptions
             {
                 Customer = customerId,
                 Status = "active"
             });
 
-            // Check if any subscription is enterprise
-            bool hasEnterprise = allSubs.Any(s =>
-                s.Items.Data.Any(item => item.Price.LookupKey == "enterprise" || item.Price.Id == "enterprise_price_id"));
+            bool hasEnterprise = false;
+            bool requestedIsEnterprise = requestedLookupKey == "enterprise";
 
-            if (hasEnterprise)
+            foreach (var sub in activeSubs)
             {
-                // Cancel all non-enterprise active subscriptions
-                foreach (var sub in allSubs)
+                foreach (var item in sub.Items.Data)
                 {
-                    var isEnterpriseSub = sub.Items.Data.Any(item =>
-                        item.Price.LookupKey == "enterprise" || item.Price.Id == "enterprise_price_id");
+                    var existingKey = item.Price.LookupKey;
 
-                    if (!isEnterpriseSub)
-                    {
-                        subscriptionService.Cancel(sub.Id);
+                    if (existingKey == "enterprise")
+                        hasEnterprise = true;
 
-                        var subDb = await _dbContext.Subscriptions.FirstOrDefaultAsync(s => s.StripeSubscriptionId == sub.Id);
-                        if (subDb != null)
-                        {
-                            subDb.Status = "canceled";
-                            subDb.UpdatedAt = DateTime.UtcNow;
-                        }
-                    }
-                }
-                await _dbContext.SaveChangesAsync();
-            }
-
-            // Cancel duplicate active subscriptions of the same plan (keep first only)
-            var groupedByPlan = allSubs
-                .GroupBy(sub => sub.Items.Data.FirstOrDefault()?.Price.Id)
-                .Where(g => g.Count() > 1);
-
-            foreach (var group in groupedByPlan)
-            {
-                var subsToCancel = group.Skip(1);
-                foreach (var sub in subsToCancel)
-                {
-                    subscriptionService.Cancel(sub.Id);
-
-                    var subDb = await _dbContext.Subscriptions.FirstOrDefaultAsync(s => s.StripeSubscriptionId == sub.Id);
-                    if (subDb != null)
-                    {
-                        subDb.Status = "canceled";
-                        subDb.UpdatedAt = DateTime.UtcNow;
-                    }
+                    if (existingKey == requestedLookupKey)
+                        return false;
                 }
             }
 
-            await _dbContext.SaveChangesAsync();
+            if (hasEnterprise && !requestedIsEnterprise)
+            {
+                return true;
+            }
+
+            if (hasEnterprise && requestedIsEnterprise)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         public async Task<string> CreateCheckoutSession(PriceRequest req)
         {
+            var customerId = "cus_SMCCo7Si4WiZwO";
+
+            var requestedPrice = await new PriceService().GetAsync(req.PriceId);
+            var requestedLookupKey = requestedPrice.LookupKey;
+
+            var subscriptionService = new SubscriptionService(_client);
+            var activeSubs = await subscriptionService.ListAsync(new SubscriptionListOptions
+            {
+                Customer = customerId,
+                Status = "active"
+            });
+
+            bool hasEnterprise = activeSubs.Any(sub =>
+                sub.Items.Data.Any(item => item.Price.LookupKey == "enterprise"));
+
+            var isEnterprise = requestedLookupKey == "enterprise";
+
+            if (!await CanSubscribeToPlan(customerId, req.PriceId))
+                throw new InvalidOperationException("You cannot subscribe to this plan based on your current subscriptions.");
+
+            if (isEnterprise)
+            {
+                foreach (var sub in activeSubs)
+                {
+                    bool isSubEnterprise = sub.Items.Data.Any(item => item.Price.LookupKey == "enterprise");
+                    if (!isSubEnterprise)
+                    {
+                        await subscriptionService.CancelAsync(sub.Id);
+                    }
+                }
+            }
+            else if (hasEnterprise && !isEnterprise)
+            {
+                foreach (var sub in activeSubs)
+                {
+                    bool isSubEnterprise = sub.Items.Data.Any(item => item.Price.LookupKey == "enterprise");
+                    if (isSubEnterprise)
+                    {
+                        await subscriptionService.CancelAsync(sub.Id);
+                    }
+                }
+            }
+
             var sessionOptions = new SessionCreateOptions
             {
                 SuccessUrl = $"{_options.Domain}/success?session_id={{CHECKOUT_SESSION_ID}}",
                 CancelUrl = $"{_options.Domain}/canceled",
                 Mode = "subscription",
-                Customer = "cus_SMCCo7Si4WiZwO",
+                Customer = customerId,
                 LineItems = new List<SessionLineItemOptions>
-                {
-                    new SessionLineItemOptions
-                    {
-                        Price = req.PriceId,
-                        Quantity = 1,
-                    },
-                },
-                BillingAddressCollection = "required",
-                //Metadata = new Dictionary<string, string>
-                //{
-                //    { "tenantId", req.Tenantid },
-                //    { "priceId", req.PriceId }
-                //}
+        {
+            new SessionLineItemOptions
+            {
+                Price = req.PriceId,
+                Quantity = 1,
+            },
+        },
+                BillingAddressCollection = "required"
             };
 
             var sessionService = new SessionService(_client);
-
-            try
-            {
-                var session = await sessionService.CreateAsync(sessionOptions);
-                return session.Url;
-            }
-            catch (StripeException ex)
-            {
-                throw new ApplicationException($"Stripe error: {ex.StripeError.Message}", ex);
-            }
+            var session = await sessionService.CreateAsync(sessionOptions);
+            return session.Url;
         }
+
 
         public async Task<CheckoutSessionDto> CheckoutSession(string sessionId)
         {
@@ -457,95 +469,10 @@ namespace CheckoutSession.core.Services
                     await _dbContext.SaveChangesAsync();
 
                     // Enforce plan rules: cancel duplicates and enforce enterprise exclusivity
-                    await EnforceEnterprisePlanRulesAsync(subscription.CustomerId);
+                    //await EnforceEnterprisePlanRulesAsync(subscription.CustomerId);
 
                     break;
 
-           
-                //    var subscription = stripeEvent.Data.Object as Subscription;
-                //    if (subscription == null) break;
-
-                //    var existingTenant = await _dbContext.Tenants
-                //        .FirstOrDefaultAsync(t => t.StripeCustomerId == subscription.CustomerId);
-
-                //    if (existingTenant == null)
-                //    {
-                //        var newTenant = new Tenant
-                //        {
-                //            TenantId = Guid.NewGuid(),
-                //            StripeCustomerId = subscription.CustomerId,
-                //            Email = subscription.Customer?.Email ?? "noemail@example.com",
-                //            Name = subscription.Customer?.Name ?? "Unknown",
-                //            AddressLine1 = subscription.Customer?.Address?.Line1 ?? "N/A",
-                //            City = subscription.Customer?.Address?.City ?? "N/A",
-                //            State = subscription.Customer?.Address?.State ?? "N/A",
-                //            PostalCode = subscription.Customer?.Address?.PostalCode ?? "000000",
-                //            Country = subscription.Customer?.Address?.Country ?? "N/A"
-                //        };
-                //        _dbContext.Tenants.Add(newTenant);
-                //        await _dbContext.SaveChangesAsync();
-
-                //        Console.WriteLine("Tenant (from subscription) saved to database");
-                //        existingTenant = newTenant;
-                //    }
-
-                //    var firstItem = subscription.Items?.Data?.FirstOrDefault();
-                //    var priceId = firstItem?.Price?.Id;
-
-                //    if (string.IsNullOrEmpty(priceId))
-                //    {
-                //        Console.WriteLine("Subscription has no valid price item.");
-                //        break;
-                //    }
-
-                //    var existingSubscription = await _dbContext.Subscriptions.FirstOrDefaultAsync(s => s.StripeSubscriptionId == subscription.Id);
-
-                //    //if (stripeEvent.Type == "customer.subscription.deleted")
-                //    //{
-                //    //    if (existingSubscription != null && existingSubscription.Status != "canceled")
-                //    //    //if (existingSubscription?.Status != subscription.Status)
-                //    //    {
-                //    //        //_dbContext.Subscriptions.Remove(existingSubscription);
-                //    //        //await _dbContext.SaveChangesAsync();
-                //    //        //subscription.Status = "canceled";
-                //    //        existingSubscription.Status = "canceled";
-                //    //        existingSubscription.UpdatedAt = DateTime.UtcNow;
-                //    //        await _dbContext.SaveChangesAsync();
-                //    //        Console.WriteLine($"Subscription {subscription.Id} canceled");
-                //    //    }
-                //    //    break;
-                //    //}
-
-                //    if (existingSubscription == null)
-                //    {
-                //        var newSubscription = new SubscriptionDb
-                //        {
-                //            StripeSubscriptionId = subscription.Id,
-                //            PlanId = priceId,
-                //            Status = subscription.Status,
-                //            IsRecurring = subscription.Items.Data.Any(item => item.Price.Recurring != null),
-                //            IsApproved = subscription.Status == "active",
-                //            CancelAtPeriodEnd = subscription.CancelAtPeriodEnd,
-                //            StartDate = subscription.StartDate,
-                //            EndDate = subscription.CancelAt,
-                //            CreatedAt = DateTime.UtcNow,
-                //            TenantId = existingTenant.TenantId
-                //        };
-                //        _dbContext.Subscriptions.Add(newSubscription);
-                //    }
-                //    else
-                //    {
-                //        existingSubscription.Status = subscription.Status;
-                //        existingSubscription.IsRecurring = subscription.Items.Data.Any(item => item.Price.Recurring != null);
-                //        existingSubscription.IsApproved = subscription.Status == "active";
-                //        existingSubscription.CancelAtPeriodEnd = subscription.CancelAtPeriodEnd;
-                //        existingSubscription.EndDate = subscription.CanceledAt;
-                //        existingSubscription.UpdatedAt = DateTime.UtcNow;
-                //    }
-
-                //    await _dbContext.SaveChangesAsync();
-                //    Console.WriteLine($"Subscription {subscription.Id} saved/updated");
-                //    break;
 
                 default:
                     Console.WriteLine($"Unhandled event type: {stripeEvent.Type}");

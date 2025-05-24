@@ -14,7 +14,8 @@ namespace CheckoutSession.core.Interfaces
         //Task<string> CreateCheckoutSession(string priceId);
         //Task<SubscriptionResponse> UpgradeOrAddPlan(string tenantId, string newPriceId);
         Task<string> CreateCheckoutSession(PriceRequest req);
-        Task EnforceEnterprisePlanRulesAsync(string customerId);
+        //Task EnforceEnterprisePlanRulesAsync(string customerId);
+        Task<bool> CanSubscribeToPlan(string customerId, string requestedPriceId);
 
         Task<CheckoutSessionDto> CheckoutSession(string sessionId);
         Task SyncPlansToStripe();

@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 
-const NewPlan = () => {
+const NewPlan = ({ currentSubscriptions = [] }) => {
   const [prices, setPrices] = useState([]);
+  const [selectedPrices, setSelectedPrices] = useState([]);
   const [error, setError] = useState("");
+
+  // Extract subscribed price IDs from current subscriptions
+  const subscribedPriceIds = currentSubscriptions.map((sub) => sub.priceId);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -19,14 +23,54 @@ const NewPlan = () => {
     fetchConfig();
   }, []);
 
-  const handleCheckout = async (priceId) => {
+  const isEnterpriseSelected = selectedPrices.some(
+    (p) => p.lookup_key === "enterprise"
+  );
+
+  const toggleSelectPrice = (price) => {
+    const isSelected = selectedPrices.some((p) => p.id === price.id);
+
+    if (isSelected) {
+      // Deselect the plan
+      setSelectedPrices(selectedPrices.filter((p) => p.id !== price.id));
+    } else {
+      if (price.lookup_key === "enterprise") {
+        // If Enterprise selected, clear all others and select only Enterprise
+        setSelectedPrices([price]);
+      } else {
+        // If selecting helpdesk or project, only allow if Enterprise NOT selected
+        if (isEnterpriseSelected) {
+          alert(
+            "Enterprise plan already selected. Deselect it to choose other plans."
+          );
+          return;
+        }
+        setSelectedPrices([...selectedPrices, price]);
+      }
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (selectedPrices.length === 0) {
+      setError("Please select at least one plan.");
+      return;
+    }
+
+    setError("");
+
     try {
+      // For demo: send only first selected plan to checkout
+      // Adjust to batch process if your backend supports multiple prices at once
+      const price = selectedPrices[0];
+      console.log("Selected price object:", price);
+
+
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId: price.id }),
       });
 
       const result = await res.json();
@@ -44,23 +88,58 @@ const NewPlan = () => {
 
   return (
     <div>
+      <h1>Choose a plan</h1>
       <div>
-        <h1>Choose a plan</h1>
+        {prices.map((price) => {
+          const isSelected = selectedPrices.some((p) => p.id === price.id);
+          const isSubscribed = subscribedPriceIds.includes(price.id);
+          const isDisabled =
+            (price.lookup_key !== "enterprise" && isEnterpriseSelected) ||
+            isSubscribed;
 
-        <div>
-          {prices.map((price) => (
-            <section key={price.id}>
-              <div>{price.lookup_key || "Untitled Plan"}</div>
+          return (
+            <section
+              key={price.id}
+              style={{
+                border: isSelected ? "2px solid green" : "1px solid gray",
+                opacity: isDisabled ? 0.5 : 1,
+                pointerEvents: isDisabled ? "none" : "auto",
+                marginBottom: "1rem",
+                padding: "0.5rem",
+                cursor: isDisabled ? "not-allowed" : "pointer",
+              }}
+              onClick={() => !isDisabled && toggleSelectPrice(price)}
+            >
+              <div>
+                <strong>{price.lookup_key || "Untitled Plan"}</strong>
+              </div>
               <div>${(price.unit_amount / 100).toFixed(2)}</div>
               <div>per {price.recurring?.interval || "period"}</div>
-              <button onClick={() => handleCheckout(price.id)}>Select</button>
+              <button
+                disabled={isDisabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSelectPrice(price);
+                }}
+              >
+                {isSelected ? "Deselect" : "Select"}
+              </button>
+              {isSubscribed && <small> (Already subscribed)</small>}
+              {price.lookup_key === "enterprise"}
             </section>
-          ))}
-        </div>
-        
-
-        {error && <div style={{ color: "red" }}>{error}</div>}
+          );
+        })}
       </div>
+
+      <button
+        onClick={handleCheckout}
+        style={{ marginTop: "1rem" }}
+        disabled={selectedPrices.length === 0}
+      >
+        Subscribe / Upgrade
+      </button>
+
+      {error && <div style={{ color: "red", marginTop: "1rem" }}>{error}</div>}
     </div>
   );
 };
